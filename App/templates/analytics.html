@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDBI Mini Bank Statement Analysis</title>
+    <link rel="stylesheet" href="{{url_for('static',filename='Style.css')}}" />
+    <link rel="stylesheet" href="{{url_for('static',filename='Analytics.css')}}" />
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-apexcharts"></script>
+</head>
+
+<body>
+    <header>
+        <h2>IDBI Mini Bank Statement Analysis</h2>
+        <nav>
+            <a href="/about">About</a>
+        </nav>
+    </header>
+
+    <div class="ReportContainer">
+        <h3 style="text-align: center;">Your IP Address :{{ip_address}} <sup class="color_darkblue" style="font-size: 0.5em;">Please Don't refresh</sup></h3>
+        <div class="initialDetails">
+            <h4>Analyzed File Name: <span class="color_darkblue"> {{file_name}}</span></h4>
+            <h4>First Date in Statement: <span class="color_darkblue"> {{first_date}}</span></h4>
+            <h4>Number of Records in Statement: <span class="color_darkblue"> {{number_of_records}}</span></h4>
+            <h4>Last Date in Statement: <span class="color_darkblue"> {{last_date}}</span></h4>
+            <h4 style="grid-column: span 2;text-align: center;">Total Difference Between Debit and Credit: 
+                <span class="color_darkblue"> {{balance_difference|round(2)}}</span>
+                {%if balance_difference<=0%} 
+                    <span class="color_red">You are in Loss</span>
+                {%else%}
+                    <span class="color_green">We are in Loss</span>
+                {%endif%}
+            </h4>
+        </div>
+        <section >
+            <h1>Search Transaction Here</h1>
+            <div >
+
+                <input type="text" name="search" id="search" placeholder="Enter Any Keyword">
+                <button type="submit" onclick="getData()">Search</button>
+            </div>
+            
+        </section>
+        <div id="outputTransactions">
+        </div>
+        <h3>Cumulative Account Balance Graph</h3>
+        <div class="cumulative_graph_container">
+            <canvas id="cumulative_balance_graph"></canvas>
+        </div>
+        <h2>Debit Details</h2>
+        <div class="debitDetails">
+            <div class="debitStats">
+                <h4>Payment Types and Count For Debit with last 2 transactions</h4>
+                <div class="initials">
+                    <h4>Total Number of Debits : <span class="color_darkblue">{{debit_table|length}} </span></h4>
+                    <h4>Total Amount of Debits : <span class="color_darkblue">{{debit_table['Amount'].sum()}} </span></h4>
+                </div>
+                <div class="paymentTypes">
+
+                    {%for index in debit_type.index%}
+                    <div class="data">
+
+                        <h5 class="payment">
+                            <span>
+                                {{index}}: <span class="color_darkblue"> {{debit_type[index]}}</span>
+                            </span>
+                            <span>
+                                Total Spend Amount: <span class="color_darkblue"> {{debit_table[debit_table['Payment_Mode']==index]['Amount'].sum()|round(2)}}</span>
+                            </span>
+                        </h5>
+                        <table border="1">
+                            <thead>
+                                <tr>
+                                    <th>Transaction Date</th>
+                                    <th>Amount</th>
+                                    <th>Payment Mode</th>
+                                    <th>Recipient Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {%for row_index in debit_table[debit_table['Payment_Mode']==index].head(2).index%}
+                                <tr>
+                                    <td>{{debit_table['Date'][row_index].date()}}</td>
+                                    <td>{{debit_table['Amount'][row_index]}}</td>
+                                    <td>{{debit_table['Payment_Mode'][row_index]}}</td>
+                                    <td>{{debit_table['Recipient_Name'][row_index]}}</td>
+                                </tr>
+                                {%endfor%}
+                            </tbody>
+                        </table>
+                    </div>
+                    {%endfor%}
+                </div>
+
+                <h4>Top 20 Recipient of Payment with last 2 transactions</h4>
+                <div class="paymentTypes">
+                    {%for index in debit_receiver.head(20).index%}
+                    <div class="data">
+
+                        <h5 class="recipient">
+                            <span>
+                                {{index}}: <span class="color_darkblue"> {{debit_receiver[index]}}</span>
+                            </span>
+                            <span>
+                                Total Spend Amount: <span class="color_darkblue"> {{debit_table[debit_table['Recipient_Name']==index]['Amount'].sum()|round(2)}}</span>
+                            </span>                        </h5>
+                        <table border="1">
+                            <thead>
+                                <tr>
+                                    <th>Transaction Date</th>
+                                    <th>Amount</th>
+                                    <th>Payment Mode</th>
+                                    <th>Recipient Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {%for row_index in debit_table[debit_table['Recipient_Name']==index].head(2).index%}
+                                <tr>
+                                    <td>{{debit_table['Date'][row_index].date()}}</td>
+                                    <td>{{debit_table['Amount'][row_index]}}</td>
+                                    <td>{{debit_table['Payment_Mode'][row_index]}}</td>
+                                    <td>{{debit_table['Recipient_Name'][row_index]}}</td>
+                                </tr>
+                                {%endfor%}
+                            </tbody>
+                        </table>
+                    </div>
+                    {%endfor%}
+                </div>
+            </div>
+            <div class="tableScroll">
+                <table border="1">
+                    <thead>
+                        <tr>
+                            <th>Transaction Date</th>
+                            <th>Amount</th>
+                            <th>Payment Mode</th>
+                            <th>Recipient Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {%for row_index in range(debit_table|length)%}
+                        <tr>
+                            <td>{{debit_table['Date'][row_index].date()}}</td>
+                            <td>{{debit_table['Amount'][row_index]}}</td>
+                            <td>{{debit_table['Payment_Mode'][row_index]}}</td>
+                            <td>{{debit_table['Recipient_Name'][row_index]}}</td>
+                        </tr>
+                        {%endfor%}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <h2>Credit Details</h2>
+        <div class="debitDetails">
+            <div class="crebitStats">
+                <h4>Payment Types and Count For Credit wth last 2 transactions</h4>
+                <div class="initials">
+                    <h4>Total Number of Credits : <span class="color_darkblue">{{credit_table|length}} </span></h4>
+                    <h4>Total Amount of Credits : <span class="color_darkblue">{{credit_table['Amount'].sum()}} </span></h4>
+                </div>
+                <div class="paymentTypes">
+                    {%for index in credit_type.index%}
+
+                    <div class="data">
+
+                        <h5 class="payment">
+                            <span>
+                                {{index}}: <span class="color_darkblue"> {{credit_type[index]}}</span>
+                            </span>
+                            <span>
+                                Total Received Amount: <span class="color_darkblue"> {{credit_table[credit_table['Payment_Mode']==index]['Amount'].sum()|round(2)}}</span>
+                            </span>
+                        </h5>
+                        <table border="1">
+                            <thead>
+                                <tr>
+                                    <th>Transaction Date</th>
+                                    <th>Amount</th>
+                                    <th>Payment Mode</th>
+                                    <th>Recipient Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {%for row_index in credit_table[credit_table['Payment_Mode']==index].head(2).index%}
+                                <tr>
+                                    <td>{{credit_table['Date'][row_index].date()}}</td>
+                                    <td>{{credit_table['Amount'][row_index]}}</td>
+                                    <td>{{credit_table['Payment_Mode'][row_index]}}</td>
+                                    <td>{{credit_table['Recipient_Name'][row_index]}}</td>
+                                </tr>
+                                {%endfor%}
+                            </tbody>
+                        </table>
+                    </div>
+                    {%endfor%}
+                </div>
+                <h4>Top 20 Clients Payment with last 2 transactions</h4>
+                <div class="paymentTypes">
+                    {%for index in credit_sender.head(20).index%}
+                    <div class="data">
+
+                        <h5 class="recipient">
+                            <span>
+                                {{index}}: <span class="color_darkblue"> {{credit_sender[index]}}</span>
+                            </span>
+                            <span>
+                                Total Received Amount: <span class="color_darkblue"> {{credit_table[credit_table['Recipient_Name']==index]['Amount'].sum()|round(2)}}</span>
+                            </span>
+                        </h5>
+                        <table border="1">
+                            <thead>
+                                <tr>
+                                    <th>Transaction Date</th>
+                                    <th>Amount</th>
+                                    <th>Payment Mode</th>
+                                    <th>Recipient Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {%for row_index in credit_table[credit_table['Recipient_Name']==index].head(2).index%}
+                                <tr>
+                                    <td>{{credit_table['Date'][row_index].date()}}</td>
+                                    <td>{{credit_table['Amount'][row_index]}}</td>
+                                    <td>{{credit_table['Payment_Mode'][row_index]}}</td>
+                                    <td>{{credit_table['Recipient_Name'][row_index]}}</td>
+                                </tr>
+                                {%endfor%}
+                            </tbody>
+                        </table>
+                    </div>
+                    {%endfor%}
+                </div>
+            </div>
+            <div class="tableScroll">
+                <table border="1">
+                    <thead>
+                        <tr>
+                            <th>Transaction Date</th>
+                            <th>Amount</th>
+                            <th>Payment Mode</th>
+                            <th>Recipient Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {%for row_index in range(credit_table|length)%}
+                        <tr>
+                            <td>{{credit_table['Date'][row_index].date()}}</td>
+                            <td>{{credit_table['Amount'][row_index]}}</td>
+                            <td>{{credit_table['Payment_Mode'][row_index]}}</td>
+                            <td>{{credit_table['Recipient_Name'][row_index]}}</td>
+                        </tr>
+                        {%endfor%}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <footer>
+        All rights are reserved || TechForEverybody
+    </footer>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{url_for('static',filename='Script.js')}}"></script>
+</html>
